@@ -38,7 +38,7 @@ export GITHUB_TIMEZONE="America/Chicago"
 ----
 Usage
 ----
-Execute the "slackhistory" file directly:
+Execute the "githubstats" file directly:
 ```
 ./githubstats <user_name> <org_name> <start_date_in_YYYYMMDDHHMM>
 ```
