@@ -12,6 +12,9 @@ else {
   $start_date = $argv[3];
 }
 
+// Set cache filenames
+$orgcachefile = "orgdata.cache";
+
 // Get API token and set timezone from environment variables
 $token = getenv('GITHUB_TOKEN');
 date_default_timezone_set(getenv('GITHUB_TIMEZONE'));
@@ -43,44 +46,48 @@ function get_headers_from_curl_response($response)
 
 /* --- Get repos from organization --- */
 
-do {
+// Check if an org cache file exists and is not more than an hour old
+if ( (time() - @filemtime($orgcachefile)) > 3600 ) {
+  do {
 
-// Set endpoint based on org name if this is the first run
-if ( $has_more == false ) {
-  $endpoint = "https://api.github.com/orgs/$organization/repos";
+  // Set endpoint based on org name if this is the first run
+  if ( $has_more == false ) {
+    $endpoint = "https://api.github.com/orgs/$organization/repos";
+  }
+
+  // Set cURL options
+  $ch = curl_init();
+  curl_setopt($ch,CURLOPT_URL, $endpoint);
+  curl_setopt($ch,CURLOPT_HEADER, true);
+  curl_setopt($ch,CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch,CURLOPT_HTTPHEADER, array("Authorization: token $token", "User-Agent: PHP"));
+
+  // Post the curl command and save the resulting data set
+  $result = curl_exec($ch);
+  $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+  $headers = get_headers_from_curl_response(substr($result, 0, $header_size));
+  array_push($orgdata, json_decode(substr($result, $header_size)));
+
+  // Determine if this is the last page of the data
+  $link = explode(" ", $headers['Link']);
+  if ( strpos($link[1],"next") != false ) {
+    $has_more = true;
+    $endpoint = str_replace(array("<",">",";",), "" ,$link[0]);
+  }
+  else {
+    $has_more = false;
+  }
+
+  } while ( $has_more == true );
+
+  // Write up-to-date data to file to cache and conserve API calls
+  file_put_contents($orgcachefile,json_encode($orgdata));
+
 }
-
-// Set cURL options
-$ch = curl_init();
-curl_setopt($ch,CURLOPT_URL, $endpoint);
-curl_setopt($ch,CURLOPT_HEADER, true);
-curl_setopt($ch,CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch,CURLOPT_HTTPHEADER, array("Authorization: token $token", "User-Agent: PHP"));
-
-// Post the curl command and save the resulting data set
-$result = curl_exec($ch);
-$header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-$headers = get_headers_from_curl_response(substr($result, 0, $header_size));
-array_push($orgdata, json_decode(substr($result, $header_size)));
-
-// Determine if this is the last page of the data
-$link = explode(" ", $headers['Link']);
-if ( strpos($link[1],"next") != false ) {
-  $has_more = true;
-  $endpoint = str_replace(array("<",">",";",), "" ,$link[0]);
-}
-else {
-  $has_more = false;
-}
-
-} while ( $has_more == true );
-
-// Write up-to-date data to file to cache and conserve API calls
-file_put_contents("orgdata.cache",json_encode($orgdata));
 
 // Testing File
 $arr = array();
-$arr = json_decode(file_get_contents("orgdata.cache"), true);
+$arr = json_decode(file_get_contents($orgcachefile), true);
 print_r($arr);
 
 ?>
