@@ -2,14 +2,19 @@
 <?php
 // Taken from https://github.com/mparker1001/githubstats. Please see associated README for instructions on how to use this script.
 
+// Get API token and set timezone from environment variables
+$token = getenv('GITHUB_TOKEN');
+date_default_timezone_set(getenv('SLACK_TIMEZONE'));
+
 // Check and set arguments. If they do not exist, then stop the script
-if (@$argv[1] == "" || @$argv[2] == "" || @$argv[3] == "") {
-  die("Usage: ./githubstats <user_name> <org_name> <start_date_in_YYYYMMDDHHMM>\n");
+if (@$argv[1] == "" || @$argv[2] == "" || @$argv[3] == "" || @$argv[4] == "") {
+  die("Usage: ./githubstats <user_name> <org_name> <start_date_in_YYYYMMDDHHMM> <end_date_in_YYYYMMDDHHMM>\n");
 }
 else {
   $username = $argv[1];
   $organization = $argv[2];
-  $start_date = $argv[3];
+  $start_date = date("c",strtotime($argv[3]));
+  $end_date = date("c",strtotime($argv[4]));
 }
 
 // Set cache filenames
@@ -18,12 +23,11 @@ $orgcachefile = "orgdata.cache";
 // Set cache expire time - 1 hour by default
 $cache_expire_time = "3600";
 
-// Get API token and set timezone from environment variables
-$token = getenv('GITHUB_TOKEN');
-date_default_timezone_set(getenv('GITHUB_TIMEZONE'));
-
 // Initialize boolen which will be used to control looping through paged results
 $has_more = false;
+
+// Zero out commits variable
+$totalcommits = 0;
 
 // Be sure the arrays containing the API data are cleared before running
 unset($orgdata);
@@ -57,34 +61,34 @@ if ( (time() - @filemtime($orgcachefile)) > $cache_expire_time ) {
   @unlink($orgcachefile);
   do {
 
-  // Set endpoint based on org name if this is the first run
-  if ( $has_more == false ) {
-    $endpoint = "https://api.github.com/orgs/$organization/repos";
-  }
+    // Set endpoint based on org name if this is the first run
+    if ( $has_more == false ) {
+      $endpoint = "https://api.github.com/orgs/$organization/repos";
+    }
 
-  // Set cURL options
-  $ch = curl_init();
-  curl_setopt($ch,CURLOPT_URL, $endpoint);
-  curl_setopt($ch,CURLOPT_HEADER, true);
-  curl_setopt($ch,CURLOPT_RETURNTRANSFER, true);
-  curl_setopt($ch,CURLOPT_HTTPHEADER, array("Authorization: token $token", "User-Agent: PHP"));
+    // Set cURL options
+    $ch = curl_init();
+    curl_setopt($ch,CURLOPT_URL, $endpoint);
+    curl_setopt($ch,CURLOPT_HEADER, true);
+    curl_setopt($ch,CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch,CURLOPT_HTTPHEADER, array("Authorization: token $token", "User-Agent: PHP"));
 
-  // Post the curl command and save the resulting data set
-  $result = curl_exec($ch);
-  $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-  $headers = get_headers_from_curl_response(substr($result, 0, $header_size));
-  $temporgdata = json_decode(substr($result, $header_size));
-  $orgdata = array_merge($orgdata, $temporgdata);
+    // Post the curl command and save the resulting data set
+    $result = curl_exec($ch);
+    $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+    $headers = get_headers_from_curl_response(substr($result, 0, $header_size));
+    $temporgdata = json_decode(substr($result, $header_size),true);
+    $orgdata = array_merge($orgdata, $temporgdata);
 
-  // Determine if this is the last page of the data
-  $link = explode(" ", $headers['Link']);
-  if ( strpos($link[1],"next") != false ) {
-    $has_more = true;
-    $endpoint = str_replace(array("<",">",";",), "" ,$link[0]);
-  }
-  else {
-    $has_more = false;
-  }
+    // Determine if this is the last page of the data
+    $link = explode(" ", $headers['Link']);
+    if ( strpos($link[1],"next") != false ) {
+      $has_more = true;
+      $endpoint = str_replace(array("<",">",";",), "" ,$link[0]);
+    }
+    else {
+      $has_more = false;
+    }
 
   } while ( $has_more == true );
 
@@ -97,6 +101,67 @@ else {
   $orgdata = json_decode(file_get_contents($orgcachefile), true);
 }
 
-print_r($orgdata);
+
+/* --- Pull commit data from each repo in organization --- */
+
+$has_more = false;
+
+echo str_pad("Organization",40) . str_pad("Commits",8) . "\n";
+echo str_pad("------------",40) . str_pad("-------",8) . "\n";
+
+foreach($orgdata as $org) {
+
+  // Clear arrays containing commit data and commits variable
+  unset($commitdata);
+  unset($tempcommitdata);
+  $commitdata=array();
+  $tempcommitdata=array();
+  $orgcommits = 0;
+
+  // Set API endpoint
+  $endpoint = strval($org['url']) . "/commits?since=$start_date&until=$end_date&author=$username";
+
+  do {
+    // Set cURL options
+    $ch = curl_init();
+    curl_setopt($ch,CURLOPT_URL, $endpoint);
+    curl_setopt($ch,CURLOPT_HEADER, true);
+    curl_setopt($ch,CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch,CURLOPT_HTTPHEADER, array("Authorization: token $token", "User-Agent: PHP"));
+
+    // Post the curl command and save the resulting data set
+    $result = curl_exec($ch);
+    $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+    $headers = get_headers_from_curl_response(substr($result, 0, $header_size));
+    $tempcommitdata = json_decode(substr($result, $header_size),true);
+
+    if ( is_array($tempcommitdata) ) {  // Ensure that commit data is not empty
+      $commitdata = array_merge($commitdata, $tempcommitdata);
+      $orgcommits += count($commitdata);
+    }
+    else {  // Indicate that the resulting data from the commit API call is from an empty repo
+      $orgcommits = "Empty";
+    }
+
+    // Determine if this is the last page of the data
+    $link = explode(" ", $headers['Link']);
+    if ( strpos($link[1],"next") != false ) {
+      $has_more = true;
+      $endpoint = str_replace(array("<",">",";",), "" ,$link[0]);
+    }
+    else {
+      $has_more = false;
+    }
+
+  } while ( $has_more == true );
+  
+  // Sum up commits and echo the repo commit stats
+  $totalcommits += $orgcommits;
+  echo str_pad($org['name'],40) . str_pad($orgcommits,8) . "\n";
+  
+}
+
+// Echo total commit stats
+echo str_pad("Total",40) . str_pad($totalcommits,8) . "\n";
 
 ?>
