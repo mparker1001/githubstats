@@ -15,6 +15,9 @@ else {
 // Set cache filenames
 $orgcachefile = "orgdata.cache";
 
+// Set cache expire time - 1 hour by default
+$cache_expire_time = "3600";
+
 // Get API token and set timezone from environment variables
 $token = getenv('GITHUB_TOKEN');
 date_default_timezone_set(getenv('GITHUB_TIMEZONE'));
@@ -22,9 +25,11 @@ date_default_timezone_set(getenv('GITHUB_TIMEZONE'));
 // Initialize boolen which will be used to control looping through paged results
 $has_more = false;
 
-// Destroy the proper variables before running
+// Be sure the arrays containing the API data are cleared before running
 unset($orgdata);
+unset($temporgdata);
 $orgdata=array();
+$temporgdata=array();
 
 // Declare get headers from curl response function
 function get_headers_from_curl_response($response)
@@ -46,8 +51,10 @@ function get_headers_from_curl_response($response)
 
 /* --- Get repos from organization --- */
 
-// Check if an org cache file exists and is not more than an hour old
-if ( (time() - @filemtime($orgcachefile)) > 3600 ) {
+// Check if an org cache file exists and is not expired
+if ( (time() - @filemtime($orgcachefile)) > $cache_expire_time ) {
+  // If the cache file does not exist or is expired, get the org data from the API
+  @unlink($orgcachefile);
   do {
 
   // Set endpoint based on org name if this is the first run
@@ -66,7 +73,8 @@ if ( (time() - @filemtime($orgcachefile)) > 3600 ) {
   $result = curl_exec($ch);
   $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
   $headers = get_headers_from_curl_response(substr($result, 0, $header_size));
-  array_push($orgdata, json_decode(substr($result, $header_size)));
+  $temporgdata = json_decode(substr($result, $header_size));
+  $orgdata = array_merge($orgdata, $temporgdata);
 
   // Determine if this is the last page of the data
   $link = explode(" ", $headers['Link']);
@@ -80,14 +88,15 @@ if ( (time() - @filemtime($orgcachefile)) > 3600 ) {
 
   } while ( $has_more == true );
 
-  // Write up-to-date data to file to cache and conserve API calls
-  file_put_contents($orgcachefile,json_encode($orgdata));
+  // After looping through all the pages, save the org data to a cache file
+  file_put_contents($orgcachefile, json_encode($orgdata));
 
 }
+else {
+  // If the cache file is not expired, import the org data from the cache file
+  $orgdata = json_decode(file_get_contents($orgcachefile), true);
+}
 
-// Testing File
-$arr = array();
-$arr = json_decode(file_get_contents($orgcachefile), true);
-print_r($arr);
+print_r($orgdata);
 
 ?>
