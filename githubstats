@@ -55,9 +55,7 @@ function get_headers_from_curl_response($response)
 
 /* --- Get repos from organization --- */
 
-// Check if an org cache file exists and is not expired
-if ( (time() - @filemtime($orgcachefile)) > $cache_expire_time ) {
-  // If the cache file does not exist or is expired, get the org data from the API
+if ( (time() - @filemtime($orgcachefile)) > $cache_expire_time ) { // If the cache file does not exist or is expired, get the org data from the API
   @unlink($orgcachefile);
   do {
 
@@ -96,8 +94,7 @@ if ( (time() - @filemtime($orgcachefile)) > $cache_expire_time ) {
   file_put_contents($orgcachefile, json_encode($orgdata));
 
 }
-else {
-  // If the cache file is not expired, import the org data from the cache file
+else { // If the cache file is not expired, import the org data from the cache file
   $orgdata = json_decode(file_get_contents($orgcachefile), true);
 }
 
@@ -138,33 +135,37 @@ foreach($orgdata as $org) {
     $headers = get_headers_from_curl_response(substr($result, 0, $header_size));
     $tempcommitdata = json_decode(substr($result, $header_size),true);
 
-    if ( is_array($tempcommitdata) ) {  // Ensure that commit data is not empty
+    if ( $headers['Status'] == "200 OK" ) {  // Ensure that API call is OK and the repo is not empty
       $commitdata = array_merge($commitdata, $tempcommitdata);
       $orgcommits += count($commitdata);
-    }
-    else {  // Indicate that the resulting data from the commit API call is from an empty repo
-      $orgcommits = "Empty";
-    }
 
-    // Determine if this is the last page of the data
-    $link = explode(" ", $headers['Link']);
-    if ( strpos($link[1],"next") != false ) {
-      $has_more = true;
-      $endpoint = str_replace(array("<",">",";",), "" ,$link[0]);
+      // Determine if this is the last page of the data
+      $link = explode(" ", $headers['Link']);
+      if ( strpos($link[1],"next") != false ) { // There is another page of data, set control variable to true
+        $has_more = true;
+        $endpoint = str_replace(array("<",">",";",), "" ,$link[0]); // Get API endpoint of next page
+      }
+      else { // No more pages of data, set control variable to false
+        $has_more = false;
+      }
     }
-    else {
+    elseif ( $headers['Status'] == "409 Conflict" ) {  // Either the repo is empty or the repo commit data could not be read. Continue the script but return the error message
+      $orgcommits = $tempcommitdata['message'];
       $has_more = false;
+    }
+    else { // Some other error occurred. Kill the script and return the status code
+      die($headers['Status']);
     }
 
   } while ( $has_more == true );
-  
-  // Sum up commits and echo the repo commit stats
+
+  // Sum up commits and echo the repo commit totals
   $totalcommits += $orgcommits;
   echo str_pad($org['name'],40) . str_pad($orgcommits,8) . "\n";
   
 }
 
-// Echo total commit stats
+// Echo total commits
 echo str_pad("-----",40) . str_pad("---",8) . "\n";
 echo str_pad("Total",40) . str_pad($totalcommits,8) . "\n";
 
