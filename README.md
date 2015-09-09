@@ -40,15 +40,15 @@ Usage
 ----
 Execute the "githubstats" file directly:
 ```
-./githubstats <user_name> <org_name> <start_date_in_YYYYMMDDHHMM>
+./githubstats <user_name> <org_name> <start_date_in_YYYYMMDDHHMM> <end_date_in_YYYYMMDDHHMM>
 ```
 
 For example:
 ```
-./gitubstats myuser myorg 201509081600
+./gitubstats myuser myorg 201509081600 201509090800
 ```
 
 Another example but saving the output to a file:
 ```
-./gitubstats myuser myorg 201509081600 >> output.txt
+./gitubstats myuser myorg 201509081600 201509090800 >> output.txt
 ```
