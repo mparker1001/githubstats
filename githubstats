@@ -104,8 +104,11 @@ else {
 
 /* --- Pull commit data from each repo in organization --- */
 
+// Reset loop control variable
 $has_more = false;
 
+// Echo information about information being pulled and table headers
+echo "Github commits for $username in $organization between " . date("Y-m-d h:i A",strtotime($start_date)) . " and " . date("Y-m-d h:i A",strtotime($end_date)) . "\n";
 echo str_pad("Organization",40) . str_pad("Commits",8) . "\n";
 echo str_pad("------------",40) . str_pad("-------",8) . "\n";
 
@@ -162,6 +165,7 @@ foreach($orgdata as $org) {
 }
 
 // Echo total commit stats
+echo str_pad("-----",40) . str_pad("---",8) . "\n";
 echo str_pad("Total",40) . str_pad($totalcommits,8) . "\n";
 
 ?>
