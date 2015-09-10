@@ -40,15 +40,18 @@ Usage
 ----
 Execute the "githubstats" file directly:
 ```
-./githubstats <user_name> <org_name> <start_date_in_YYYYMMDDHHMM> <end_date_in_YYYYMMDDHHMM>
+./githubstats -o <org_name> -s <start_date_in_YYYYMMDDHHMM> -e
+<end_date_in_YYYYMMDDHHMM> -u <github_username> -f <file_of_github_usernames>
+-d (Optional)
 ```
 
 For example:
 ```
-./gitubstats myuser myorg 201509081600 201509090800
+./githubstats -o myorg -s 201507010000 -e 201509010000 -f users.list -d
 ```
 
 Another example but saving the output to a file:
 ```
-./gitubstats myuser myorg 201509081600 201509090800 >> output.txt
+./githubstats -o myorg -s 201507010000 -e 201509010000 -f users.list -d  >>
+output.txt
 ```
