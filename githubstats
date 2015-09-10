@@ -14,8 +14,11 @@ $cache_expire_time = "3600";
 
 // Configure script usage message
 $str_usage = <<<EOD
-usage:  githubstats -o <org_name> -s <start_date_in_YYYYMMDDHHMM> -e <end_date_in_YYYYMMDDHHMM> -u <github_username> -f <file_of_github_usernames> -d (Optional)
-  Note that the -u or -f option is REQUIRED. If both options are used, the filename will be used.
+usage:  githubstats -o [org_name] -s [start_date_in_YYYYMMDDHHMM] -e [end_date_in_YYYYMMDDHHMM] -u [github_username]
+                    -f [file_of_github_usernames] -d [show_details (Optional)] -n [suppress_zero_commit_orgs (Optional]
+
+  * Note that the -u or -f option is REQUIRED. If both options are used, the filename will be used.
+
 
 EOD;
 
@@ -49,7 +52,7 @@ function get_headers_from_curl_response($response)
 
 /* --- Check and set command line arguments --- */
 
-$options = getopt("ds:e:o:u:f:");
+$options = getopt("nds:e:o:u:f:");
 $kill_script = false;
 
 if ( is_null($options['s']) || $options['s'] == false ) {
@@ -89,6 +92,9 @@ else {
   }
   if ( array_key_exists("d",$options) ) {
     $showdetail = true;
+  }
+  if ( array_key_exists("n",$options) ) {
+    $suppresszero = true;
   }
 }
 
@@ -223,6 +229,8 @@ foreach ($userlist as $username) {
 
   foreach ($allcommitdata as $key => $orgcommitdata) {
     $orgcommits = 0;
+    $displayorgdata = true;
+
     foreach ($orgcommitdata as $commit) {
       if ($commit["committer"]["login"] == $username) {
         $orgcommits += 1;
@@ -231,7 +239,12 @@ foreach ($userlist as $username) {
     // Sum up commits and echo the repo commit totals
     $totalcommits += $orgcommits;
     if ($showdetail) {
-      echo str_pad($key,40) . str_pad($orgcommits,8) . "\n";
+      if ( ( $orgcommits == 0 ) && ($suppresszero ) ) {
+        $displayorgdata = false;
+      }
+      if ($displayorgdata) {
+        echo str_pad($key,40) . str_pad($orgcommits,8) . "\n";
+      }
     }
   }
   // Echo total commits
