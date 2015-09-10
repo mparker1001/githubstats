@@ -4,19 +4,49 @@
 
 // Get API token and set timezone from environment variables
 $token = getenv('GITHUB_TOKEN');
-date_default_timezone_set(getenv('SLACK_TIMEZONE'));
+date_default_timezone_set(getenv('GITHUB_TIMEZONE'));
+
+// Write script usage string
+$str_usage = "usage:  githubstats -o <org_name> -s <start_date_in_YYYYMMDDHHMM> -e <end_date_in_YYYYMMDDHHMM> -u <github_username> -f <file_of_github_usernames>\n  Note that the -u or -f option is REQUIRED. If both options are used, the filename will be used.\n\n";
 
 // Check and set arguments. If they do not exist, then stop the script
-if (@$argv[1] == "" || @$argv[2] == "" || @$argv[3] == "" || @$argv[4] == "") {
-  die("Usage: ./githubstats <user_name> <org_name> <start_date_in_YYYYMMDDHHMM> <end_date_in_YYYYMMDDHHMM>\n");
-}
-else {
-  $username = $argv[1];
-  $organization = $argv[2];
-  $start_date = date("c",strtotime($argv[3]));
-  $end_date = date("c",strtotime($argv[4]));
+$options = getopt("s:e:o:u:f:");
+$kill_script = false;
+
+if ( is_null($options['s']) || $options['s'] == false ) {
+  $str_error = "ERROR: Incorrect or Missing Start Date\n";
+  $kill_script = true;
 }
 
+if ( is_null($options['e']) || $options['e'] == false ) {
+  $str_error .= "ERROR: Incorrect or Missing End Date\n";
+  $kill_script = true;
+}
+
+if ( is_null($options['o']) || $options['o'] == false ) {
+  $str_error .= "ERROR: Incorrect or Missing Organization\n";
+  $kill_script = true;
+}
+
+if ( ( is_null($options['u']) || $options['u'] == false ) && ( is_null($options['f']) || $options['f'] == false ) ) {
+  $str_error .= "ERROR: Incorrect or Missing Organization\n";
+  $kill_script = true;
+}
+
+if ($kill_script) {
+  echo $str_error;
+  die($str_usage);
+}
+else {
+  $start_date = date("c",strtotime($options['s']));
+  $end_date = date("c",strtotime($options['e']));
+  $organization = $options['o'];
+  $username = @$options['u'];
+  $userfile = @$options['f'];
+}
+
+var_dump($options);
+die();
 // Set cache filenames
 $orgcachefile = "orgdata.cache";
 
