@@ -100,6 +100,7 @@ else {
 /* --- Get repos from organization --- */
 
 if ( (time() - @filemtime($orgcachefile)) > $cache_expire_time ) { // If the cache file does not exist or is expired, get the org data from the API
+  echo "Repo cache file not found or expired. Querying Github API for repo data";
   @unlink($orgcachefile);
   do {
 
@@ -131,10 +132,12 @@ if ( (time() - @filemtime($orgcachefile)) > $cache_expire_time ) { // If the cac
     else {
       $has_more = false;
     }
+    echo ".";
 
   } while ( $has_more == true );
 
   // After looping through all the pages, save the org data to a cache file
+  echo "DONE\n";
   file_put_contents($orgcachefile, json_encode($orgdata));
 
 }
@@ -149,6 +152,7 @@ else { // If the cache file is not expired, import the org data from the cache f
 $has_more = false;
 
 if ( (time() - @filemtime($commitcachefile)) > $cache_expire_time ) { // If the cache file does not exist or is expired, get the commit data from the API
+  echo "Commit cache file not found or expired. Querying API for commit data (This may take a while)";
   @unlink($commitcachefile);
 
   foreach($orgdata as $org) {
@@ -197,6 +201,7 @@ if ( (time() - @filemtime($commitcachefile)) > $cache_expire_time ) { // If the 
       else { // Some other error occurred. Kill the script and return the status code
         die($headers['Status']);
       }
+      echo ".";
 
     } while ( $has_more == true );
 
@@ -205,6 +210,7 @@ if ( (time() - @filemtime($commitcachefile)) > $cache_expire_time ) { // If the 
   }
 
   // Store the contents into a cache file
+  echo "DONE\n\n";
   file_put_contents($commitcachefile, json_encode($allcommitdata));
 
 }
